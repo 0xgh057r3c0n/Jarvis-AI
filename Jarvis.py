@@ -11,7 +11,6 @@ from selenium.webdriver.common.by import By
 from termcolor import colored
 from googlesearch import search
 
-# Function to display the colored banner
 def display_banner():
     robot_art = r"""
 ⠀⠀⠀⠀⠀⠀⠀⠀⣀⣀⣠⣤⣤⣤⣤⣤⣤⣄⣀⣀⡀⠀⠀⠀⠀⠀⠀⠀
@@ -29,29 +28,24 @@ def display_banner():
 ⠀⠀⠀⠀⠀⠙⢿⠀⢸⣿⣿⠋⣉⣉⣉⣉⠉⣿⣿⡇⠀⡿⠋⠀⠀⠀⠀⠀
 ⠀⠀⠀⠀⠀⠀⠀⠀⠸⣿⠃⣼⣿⣿⣿⣿⣧⠘⣿⠇⠀⠀⠀⠀⠀⠀⠀⠀
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠘⠛⠛⠛⠛⠛⠛⠂⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-
     """
     print(colored(robot_art, 'red'))
     print(colored("===========================", 'cyan'))
     print(colored("|    Virtual Assistant    |", 'cyan'))
     print(colored("|      Version: 1.0       |", 'yellow'))
     print(colored("|   Author: G4UR4V007     |", 'green'))
-    print(colored("|                         |", 'green'))
     print(colored("===========================", 'cyan'))
 
-# Function to convert text to speech
 def speak(text):
-    if text.strip():  # Check if text is not empty
+    if text and text.strip():
         tts = gTTS(text=text, lang='en')
         with tempfile.NamedTemporaryFile(delete=True) as tmp_file:
             tts.save(f"{tmp_file.name}.mp3")
             playsound.playsound(f"{tmp_file.name}.mp3")
 
-# Function to ask the user a question
 def ask_question():
     return input("Ask me anything: ")
 
-# Function to provide help and usage information
 def show_help():
     help_text = """
     Virtual Assistant - Help Guide
@@ -71,32 +65,28 @@ def show_help():
     print(help_text)
     speak(help_text)
 
-# Function to search for information using Google
 def google_search(query):
     results = []
     try:
-        for result in search(query, num_results=1):  # Use num_results for the first result
-            if result.startswith("http"):  # Ensure URL is valid
+        for result in search(query, num_results=1):
+            if result.startswith("http"):
                 results.append(result)
-                break  # Stop after getting the first valid result
+                break
     except Exception as e:
         print(f"Error during Google search: {str(e)}")
         return []
     return results
 
-# Function to read content from a webpage
 def read_webpage(url):
     driver = webdriver.Firefox()
     try:
-        print(f"Visiting URL: {url}")  # Debug output
+        print(f"Visiting URL: {url}")
         driver.get(url)
-        time.sleep(3)  # Wait for the page to load
+        time.sleep(3)
 
-        # Extract the main content
         content = driver.find_element(By.TAG_NAME, 'body').text
         paragraphs = content.splitlines()
 
-        # Display and read the first two paragraphs aloud
         if len(paragraphs) > 1:
             first_paragraph = paragraphs[0]
             second_paragraph = paragraphs[1]
@@ -105,7 +95,6 @@ def read_webpage(url):
             speak(first_paragraph)
             speak(second_paragraph)
 
-            # Ask if the user wants to read more
             user_choice = input("Would you like me to read more? (yes/no): ").lower()
             if user_choice == "yes":
                 for paragraph in paragraphs[2:]:
@@ -120,23 +109,19 @@ def read_webpage(url):
     finally:
         driver.quit()
 
-# Function to fetch answers or perform tasks
 def perform_task(query):
     query = query.lower()
 
-    # Basic greetings and responses
     if "hello" in query or "hi" in query:
         return "Hello! How can I assist you today?"
 
     elif "how are you" in query:
-        return "I'm Jarvis just a virtual assistant, but thanks for asking! How are you?"
+        return "I'm Jarvis, just a virtual assistant, but thanks for asking! How are you?"
 
-    # Help and guidance
     elif "help" in query:
         show_help()
         return "Showing help and usage information."
 
-    # Basic queries about the assistant and system
     elif "who is your owner" in query:
         return "I was created by Gaurav Bhattacharjee."
     elif "what is your name" in query:
@@ -154,55 +139,52 @@ def perform_task(query):
             subprocess.run(['xdg-open', 'https://www.google.com'])
         return "Opening your default browser."
 
-    # Play song on YouTube
     elif "play song" in query:
         song_name = query.split("play song")[-1].strip()
-        play_song(song_name)
-        return f"Playing {song_name} on YouTube."
+        if song_name:
+            return play_song(song_name)
+        else:
+            return "Please specify a song to play."
 
-    # Search for information
     elif "tell me about" in query or "what is" in query:
         speak("Let me check Google for that.")
         google_results = google_search(query)
         
         if google_results:
-            first_result = google_results[0]  # Get the first result
-            read_webpage(first_result)  # Read the content of the first result
+            first_result = google_results[0]
+            read_webpage(first_result)
         else:
             speak("Sorry, I couldn't find any information on Google.")
 
     return "I don't know the answer to that yet."
 
-# Function to play a song from YouTube
 def play_song(song_name):
     speak(f"Searching for {song_name} on YouTube.")
-    driver = webdriver.Firefox()  # Initialize Firefox WebDriver
+    driver = webdriver.Firefox()
     try:
         driver.get("https://www.youtube.com/results?search_query=" + song_name)
-        time.sleep(2)  # Wait for the page to load
+        time.sleep(2)
 
-        # Click on the first video result
         first_video = driver.find_element(By.XPATH, '//*[@id="video-title"]')
         first_video.click()
-        time.sleep(5)  # Allow video to start
+        time.sleep(5)
 
-        # Skip the ad if present
         try:
             skip_button = driver.find_element(By.XPATH, '//*[@id="skip-button"]/a')
             skip_button.click()
-            time.sleep(1)  # Wait for a moment after skipping
+            time.sleep(1)
         except:
-            pass  # No ad to skip
+            pass
 
         speak(f"Now playing {song_name} on YouTube.")
     except Exception as e:
         print(f"Error during playback: {e}")
         speak("I couldn't play the song. Please check your internet connection.")
-    # Removed driver.quit() to keep the window open
+    return None  # Ensure function returns None explicitly
 
 if __name__ == "__main__":
-    display_banner()  # Display the banner
-    speak("Hello! I'm Jarvis your virtual assistant, developed by Gaurav Bhattacharjee. You can ask me anything.")
+    display_banner()
+    speak("Hello! I'm Jarvis, your virtual assistant, developed by Gaurav Bhattacharjee. You can ask me anything.")
     
     while True:
         try:
@@ -213,10 +195,11 @@ if __name__ == "__main__":
                 break
 
             response = perform_task(question)
+            if response is None:  # Handle case where response might be None
+                response = "I didn't understand that."
             print(f"Answer: {response}")
             speak(response)
 
         except KeyboardInterrupt:
             speak("Task skipped. You can ask me anything else.")
-            continue  # Skip the current task and continue asking for input
-
+            continue
