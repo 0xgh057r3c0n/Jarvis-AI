@@ -81,24 +81,27 @@ def google_search(query):
 def read_webpage(url):
     driver = webdriver.Firefox()
     try:
-        print(f"Visiting URL: {url}")
+        message = f"Visiting URL: {url}"
+        print(message)
+
         driver.get(url)
         time.sleep(3)
 
         content = driver.find_element(By.TAG_NAME, 'body').text
         paragraphs = content.splitlines()
 
-        if len(paragraphs) > 1:
-            first_paragraph = paragraphs[0]
-            second_paragraph = paragraphs[1]
-            print(f"First Paragraph: {first_paragraph}")
-            print(f"Second Paragraph: {second_paragraph}")
-            speak(first_paragraph)
-            speak(second_paragraph)
+        filtered_paragraphs = [
+            p for p in paragraphs if len(p.split()) > 5 and "about" not in p.lower()
+        ]
 
+        if len(filtered_paragraphs) > 1:
+            for paragraph in filtered_paragraphs:
+                print(paragraph)
+                speak(paragraph)
+                
             user_choice = input("Would you like me to read more? (yes/no): ").lower()
             if user_choice == "yes":
-                for paragraph in paragraphs[2:]:
+                for paragraph in filtered_paragraphs:
                     print(paragraph)
                     speak(paragraph)
             else:
@@ -106,7 +109,9 @@ def read_webpage(url):
         else:
             speak("I found no relevant content to read aloud.")
     except Exception as e:
-        print(f"Error reading webpage: {e}")
+        error_message = f"Error reading webpage: {e}"
+        print(error_message)
+        speak(error_message)
     finally:
         driver.quit()
 
