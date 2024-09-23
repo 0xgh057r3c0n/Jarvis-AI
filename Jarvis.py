@@ -82,7 +82,7 @@ def read_webpage(url):
     driver = webdriver.Firefox()
     try:
         message = f"Visiting URL: {url}"
-        print(message)
+        print(message)  # Keep this for logging, but don't speak it
 
         driver.get(url)
         time.sleep(3)
@@ -90,11 +90,12 @@ def read_webpage(url):
         content = driver.find_element(By.TAG_NAME, 'body').text
         paragraphs = content.splitlines()
 
+        # Filter out short paragraphs and specific unwanted words
         filtered_paragraphs = [
             p for p in paragraphs if len(p.split()) > 5 and "about" not in p.lower()
         ]
 
-        if len(filtered_paragraphs) > 1:
+        if len(filtered_paragraphs) > 0:
             for paragraph in filtered_paragraphs:
                 print(paragraph)
                 speak(paragraph)
@@ -114,6 +115,7 @@ def read_webpage(url):
         speak(error_message)
     finally:
         driver.quit()
+
 
 def perform_task(query):
     query = query.lower()
