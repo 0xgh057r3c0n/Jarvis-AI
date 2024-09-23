@@ -8,6 +8,7 @@ import tempfile
 import time
 from selenium import webdriver
 from selenium.webdriver.common.by import By
+from selenium.webdriver.firefox.options import Options
 from termcolor import colored
 from googlesearch import search
 
@@ -160,33 +161,49 @@ def perform_task(query):
 
 def play_song(song_name):
     speak(f"Searching for {song_name} on YouTube.")
-    driver = webdriver.Firefox()
+
+    firefox_options = Options()
+    driver = webdriver.Firefox(options=firefox_options)
+    
     try:
-        driver.get("https://www.youtube.com/results?search_query=" + song_name)
+        driver.get(f"https://www.youtube.com/results?search_query={song_name}")
         time.sleep(2)
 
         first_video = driver.find_element(By.XPATH, '//*[@id="video-title"]')
         first_video.click()
         time.sleep(5)
-        ad_skipped = False
-        while not ad_skipped:
-            try:
-                skip_button = driver.find_element(By.CLASS_NAME, 'ytp-ad-skip-button')
-                skip_button.click()
-                speak("Ad skipped.")
-                ad_skipped = True
-            except Exception as e:
-                print("No skip ad button found, waiting for ad to finish...")
 
-            time.sleep(2)
+        ad_playing = True
+        while ad_playing:
+            try:
+                ad_indicator = driver.find_element(By.CLASS_NAME, 'ytp-ad-text')
+                message = "Ad is playing, waiting for it to finish or skip button to appear..."
+                print(message)
+                speak(message)
+                
+                try:
+                    skip_button = driver.find_element(By.CLASS_NAME, 'ytp-ad-skip-button')
+                    skip_button.click()
+                    message = "Ad skipped."
+                    print(message)
+                    speak(message)
+                    ad_playing = False
+                except:
+                    time.sleep(3)
+            except:
+                message = "No ads detected, video is playing."
+                print(message)
+                speak(message)
+                ad_playing = False
 
         speak(f"Now playing {song_name} on YouTube.")
-
+    
     except Exception as e:
-        print(f"Error during playback: {e}")
+        error_message = f"Error during playback: {e}"
+        print(error_message)
         speak("I couldn't play the song. Please check your internet connection.")
-
-    return None  
+    
+    return "Song is now playing on YouTube."
 if __name__ == "__main__":
     display_banner()
     speak("Hello! I'm Jarvis, your virtual assistant, developed by Gaurav Bhattacharjee. You can ask me anything.")
