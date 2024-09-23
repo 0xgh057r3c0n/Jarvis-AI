@@ -168,20 +168,25 @@ def play_song(song_name):
         first_video = driver.find_element(By.XPATH, '//*[@id="video-title"]')
         first_video.click()
         time.sleep(5)
+        ad_skipped = False
+        while not ad_skipped:
+            try:
+                skip_button = driver.find_element(By.CLASS_NAME, 'ytp-ad-skip-button')
+                skip_button.click()
+                speak("Ad skipped.")
+                ad_skipped = True
+            except Exception as e:
+                print("No skip ad button found, waiting for ad to finish...")
 
-        try:
-            skip_button = driver.find_element(By.XPATH, '//*[@id="skip-button"]/a')
-            skip_button.click()
-            time.sleep(1)
-        except:
-            pass
+            time.sleep(2)
 
         speak(f"Now playing {song_name} on YouTube.")
+
     except Exception as e:
         print(f"Error during playback: {e}")
         speak("I couldn't play the song. Please check your internet connection.")
-    return None  # Ensure function returns None explicitly
 
+    return None  
 if __name__ == "__main__":
     display_banner()
     speak("Hello! I'm Jarvis, your virtual assistant, developed by Gaurav Bhattacharjee. You can ask me anything.")
@@ -195,7 +200,7 @@ if __name__ == "__main__":
                 break
 
             response = perform_task(question)
-            if response is None:  # Handle case where response might be None
+            if response is None:  
                 response = "I didn't understand that."
             print(f"Answer: {response}")
             speak(response)
