@@ -74,15 +74,15 @@ pip install gtts wikipedia selenium playsound termcolor googlesearch-python
 ===========================
 |    Virtual Assistant    |
 |       Version: 1.0      |
-|  Developed by Gaurav    |
-|   Bhattacharjee         |
+|     Author: G4UR4V007   |
+|                         |
 ===========================
 ```
 
 After the banner is displayed, the assistant will start with a welcome message and await your input:
 
 ```bash
-Hello! I'm your virtual assistant, developed by Gaurav Bhattacharjee. You can ask me anything.
+Hello! I'm Jarvis your virtual assistant, developed by Gaurav Bhattacharjee. You can ask me anything.
 Ask me anything: 
 ```
 
