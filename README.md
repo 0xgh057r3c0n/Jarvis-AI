@@ -163,7 +163,7 @@ This project is licensed under the GNU General Public License v3.0. You can redi
 - **Freedom to Contribute**: You can contribute changes back to the community.
 - **Copyleft**: Any modifications or derived works must also be licensed under GPL-3.0, ensuring freedom for all users.
 
-For more information, read the full [GPL-3.0 License](https://www.gnu.org/licenses/gpl-3.0.en.html).
+For more information, read the full [GPL-3.0 License]([https://www.gnu.org/licenses/gpl-3.0.en.html](https://github.com/0xgh057r3c0n/Jarvis-AI/blob/main/LICENSE)).
 
 ---
 
