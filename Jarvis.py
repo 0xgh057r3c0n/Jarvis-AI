@@ -1,234 +1,250 @@
-from gtts import gTTS
-import wikipedia
 import platform
 import os
 import subprocess
-import playsound
 import tempfile
 import time
+import requests
+import speech_recognition as sr
+from gtts import gTTS
+import playsound
+from termcolor import colored
 from selenium import webdriver
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.firefox.options import Options
-from termcolor import colored
+from selenium.common.exceptions import NoSuchElementException
 from googlesearch import search
+import contextlib
+import sys
+
+# Gemini API Setup
+GEMINI_API_KEY = "AIzaSyAJiKNprgDXWiyHggCvL9qcwg0XYyEgPYs"
+GEMINI_MODEL = "gemini-2.0-flash"
+GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
+HEADERS = {"Content-Type": "application/json"}
 
 def display_banner():
-    robot_art = r"""
-⠀⠀⠀⠀⠀⠀⠀⠀⣀⣀⣠⣤⣤⣤⣤⣤⣤⣄⣀⣀⡀⠀⠀⠀⠀⠀⠀⠀
-⣶⣶⣶⣶⡄⢰⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡆⢠⣴⣶⣶⣶
-⢹⣿⡿⣿⣷⠀⠿⣿⣿⣿⣦⣀⠀⠀⠀⠀⣀⣴⣿⣿⣿⠿⠀⣾⣿⢿⣿⡏
-⠘⣿⣷⣬⡙⠿⣦⣌⡙⠿⣿⣿⣷⣦⣴⣾⣿⣿⠿⢋⣡⣴⠿⣿⣯⣿⣿⠃
-⠀⢻⣿⣌⠛⢷⣌⡙⢿⣶⡌⠙⢿⣿⣿⠿⠋⢡⣶⡿⢋⣡⡶⠛⣡⣿⡟⠀
-⠀⠘⠿⣿⣿⣦⣌⠛⢾⣿⣇⠸⣷⣌⣡⣶⡇⣸⣿⡷⠛⣡⣴⣿⣿⠿⠃⠀
-⠀⠀⢠⣌⠻⢿⣿⣿⣦⣿⣿⠀⣿⣿⣿⣿⠀⣿⣿⣴⣿⣿⡿⠟⣡⡄⠀⠀
-⠀⠀⢸⣿⣷⠀⠀⠉⠉⠉⠛⠀⣿⣿⣿⣿⠀⠛⠉⠉⠉⠀⠀⣾⣿⡇⠀⠀
-⠀⠀⢸⣿⣿⣿⣦⠀⢠⣴⣾⡇⢸⣿⣿⣿⠀⣷⣦⡄⠀⣴⣿⣿⣿⡇⠀⠀
-⠀⠀⠀⣿⣿⣿⣿⠀⢸⣿⣿⡇⢸⣿⣿⣿⠀⣿⣿⡇⠀⣿⣿⣿⣿⠁⠀⠀
-⠀⠀⠀⣿⣿⣿⣿⠀⢸⣿⣿⡇⢾⣿⣿⣿⠀⣿⣿⡇⠀⣿⣿⣿⣿⠀⠀⠀
-⠀⠀⠀⠻⢿⣿⣿⠀⢸⣿⣿⣷⣶⣶⣶⣶⣶⣿⣿⡇⠀⣿⣿⣿⠟⠀⠀⠀
-⠀⠀⠀⠀⠀⠙⢿⠀⢸⣿⣿⠋⣉⣉⣉⣉⠉⣿⣿⡇⠀⡿⠋⠀⠀⠀⠀⠀
-⠀⠀⠀⠀⠀⠀⠀⠀⠸⣿⠃⣼⣿⣿⣿⣿⣧⠘⣿⠇⠀⠀⠀⠀⠀⠀⠀⠀
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠘⠛⠛⠛⠛⠛⠛⠂⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-    """
+    robot_art = """
+            ⠀⠀⠀⠀⠀⠀⣀⣀⣠⣤⣤⣤⣤⣤⣤⣄⣀⣀⡀⠀⠀⠀⠀⠀⠀⠀
+            ⣶⣶⣶⣶⡄⢰⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡆⢠⣴⣶⣶⣶
+            ⢹⣿⡿⣿⣷⠀⠿⣿⣿⣿⣦⣀⠀⠀⠀⠀⣀⣴⣿⣿⣿⠿⠀⣾⣿⢿⣿⡏
+            ⠘⣿⣷⣬⡙⠿⣦⣌⡙⠿⣿⣿⣷⣦⣴⣾⣿⣿⠿⢋⣡⣴⠿⣿⣯⣿⣿⠃
+            ⠀⢻⣿⣌⠛⢷⣌⡙⢿⣶⡌⠙⢿⣿⣿⠿⠋⢡⣶⡿⢋⣡⡶⠛⣡⣿⡟⠀
+            ⠀⠘⠿⣿⣿⣦⣌⠛⢾⣿⣇⠸⣷⣌⣡⣶⡇⣸⣿⡷⠛⣡⣴⣿⣿⠿⠃⠀
+            ⠀⠀⢠⣌⠻⢿⣿⣿⣦⣿⣿⠀⣿⣿⣿⣿⠀⣿⣿⣴⣿⣿⡿⠟⣡⡄⠀⠀
+            ⠀⠀⢸⣿⣷⠀⠀⠉⠉⠉⠛⠀⣿⣿⣿⣿⠀⠛⠉⠉⠉⠀⠀⣾⣿⡇⠀⠀
+            ⠀⠀⢸⣿⣿⣿⣦⠀⢠⣴⣾⡇⢸⣿⣿⣿⠀⣷⣦⡄⠀⣴⣿⣿⣿⡇⠀⠀
+            ⠀⠀⠀⣿⣿⣿⣿⠀⢸⣿⣿⡇⢸⣿⣿⣿⠀⣿⣿⡇⠀⣿⣿⣿⣿⠁⠀⠀
+            ⠀⠀⠀⣿⣿⣿⣿⠀⢸⣿⣿⡇⢾⣿⣿⣿⠀⣿⣿⡇⠀⣿⣿⣿⣿⠀⠀⠀
+            ⠀⠀⠀⠻⢿⣿⣿⠀⢸⣿⣿⣷⣶⣶⣶⣶⣶⣿⣿⡇⠀⣿⣿⣿⠟⠀⠀⠀
+            ⠀⠀⠀⠀⠀⠙⢿⠀⢸⣿⣿⠋⣉⣉⣉⣉⠉⣿⣿⡇⠀⡿⠋⠀⠀⠀⠀⠀
+            ⠀⠀⠀⠀⠀⠀⠀⠀⠸⣿⠃⣼⣿⣿⣿⣿⣧⠘⣿⠇⠀⠀⠀⠀⠀⠀⠀⠀
+            ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠘⠛⠛⠛⠛⠛⠛⠂⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+"""
     print(colored(robot_art, 'red'))
     print(colored("===========================", 'cyan'))
     print(colored("|    Virtual Assistant    |", 'cyan'))
-    print(colored("|      Version: 1.0       |", 'yellow'))
-    print(colored("|   Author: G4UR4V007     |", 'green'))
+    print(colored("|      Version: 2.0       |", 'yellow'))
+    print(colored("|   Author: 0xgh057r3c0n  |", 'green'))
     print(colored("===========================", 'cyan'))
 
 def speak(text):
-    if text and text.strip():
+    if text.strip():
         tts = gTTS(text=text, lang='en')
-        with tempfile.NamedTemporaryFile(delete=True) as tmp_file:
-            tts.save(f"{tmp_file.name}.mp3")
-            playsound.playsound(f"{tmp_file.name}.mp3")
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_file:
+            tts.save(tmp_file.name)
+            with open(os.devnull, 'w') as fnull, contextlib.redirect_stderr(fnull):
+                playsound.playsound(tmp_file.name)
+            os.remove(tmp_file.name)
 
 def ask_question():
-    return input("Ask me anything: ")
+    recognizer = sr.Recognizer()
+    with sr.Microphone() as source:
+        print("🎤 Listening...")
+        try:
+            with contextlib.redirect_stderr(open(os.devnull, 'w')):
+                recognizer.adjust_for_ambient_noise(source)
+                audio = recognizer.listen(source)
+
+            query = recognizer.recognize_google(audio)
+            print(f"You: {query}")
+            return query
+        except sr.UnknownValueError:
+            speak("Sorry, I didn't catch that.")
+            return ""
+        except sr.RequestError:
+            speak("Speech recognition service is unavailable.")
+            return ""
+
+def normalize(text):
+    return text.strip().lower()
+
+def ask_gemini(prompt):
+    try:
+        payload = {"contents": [{"parts": [{"text": prompt}]}]}
+        res = requests.post(GEMINI_API_URL, headers=HEADERS, json=payload)
+        res.raise_for_status()
+        return res.json()['candidates'][0]['content']['parts'][0]['text'].strip()
+    except Exception as e:
+        return f"Gemini error: {e}"
+
+def google_search(query):
+    try:
+        return next(search(query, num_results=1))
+    except:
+        return None
+
+def read_webpage(url):
+    options = Options()
+    options.set_preference("log.level", "3")
+    driver = webdriver.Firefox(options=options)
+    try:
+        driver.get(url)
+        time.sleep(3)
+        content = driver.find_element(By.TAG_NAME, "body").text
+        for p in content.splitlines():
+            if len(p.strip().split()) > 5:
+                print(p)
+                speak(p)
+    finally:
+        driver.quit()
+
+def play_song(song_name):
+    speak(f"Playing {song_name} on YouTube.")
+    options = Options()
+    options.set_preference("media.autoplay.default", 0)
+    options.set_preference("media.autoplay.blocking_policy", 0)
+    options.set_preference("media.autoplay.allow-extension-background-pages", True)
+    options.set_preference("log.level", "3")
+
+    driver = webdriver.Firefox(options=options)
+
+    try:
+        driver.get(f"https://www.youtube.com/results?search_query={song_name}")
+        time.sleep(3)
+        video = driver.find_element(By.ID, "video-title")
+        video_url = video.get_attribute("href")
+        driver.get(video_url + "&autoplay=1")
+        time.sleep(5)
+        driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ARROW_DOWN)
+        driver.execute_script("document.querySelector('video').play()")
+
+        speak("Checking for ads...")
+        ad_skipped = False
+        for _ in range(15):
+            try:
+                skip_button = driver.find_element(By.CLASS_NAME, "ytp-ad-skip-button")
+                speak("Ad is playing... Skipping now.")
+                skip_button.click()
+                ad_skipped = True
+                speak("Ad skipped.")
+                break
+            except NoSuchElementException:
+                time.sleep(1)
+        if not ad_skipped:
+            speak("Ad ended or could not be skipped.")
+
+        driver.find_element(By.TAG_NAME, "body").send_keys("f")
+        time.sleep(1)
+        driver.execute_script("document.querySelector('video').play()")
+        speak("Playing now. Press Enter to stop.")
+        input("🎵 Press Enter to close the browser and stop music...")
+
+    except Exception as e:
+        speak(f"Error playing song: {e}")
+    finally:
+        driver.quit()
+    return "Done"
 
 def show_help():
     help_text = """
-    Virtual Assistant - Help Guide
-
-    You can ask me to perform various tasks such as:
-    1. Ask about the developer: "Who is your owner?"
-    2. Ask about the system: "What is your operating system?"
-    3. Open terminal: "Open terminal"
-    4. Open browser: "Open browser"
-    5. Play a song from YouTube: "Play song [song name]"
-    6. Ask a question or search information: "Tell me about [topic]"
-    7. Read content from a webpage aloud: "Read this webpage"
-    8. Greet: "Hello", "Hi", "How are you?"
-
-    Type 'exit', 'quit', or 'goodbye' to exit the assistant.
+    You can ask me to:
+    - Play a song: 'Play song [song name]'
+    - Ask anything: 'What is...', 'Who is...'
+    - Get system info: 'What is your operating system'
+    - Open apps: 'Open terminal', 'Open browser'
+    - Know me: 'What is your name', 'Who is your owner'
+    - Quit: 'Exit', 'Quit', 'Goodbye'
     """
     print(help_text)
     speak(help_text)
 
-def google_search(query):
-    results = []
-    try:
-        for result in search(query, num_results=1):
-            if result.startswith("http"):
-                results.append(result)
-                break
-    except Exception as e:
-        print(f"Error during Google search: {str(e)}")
-        return []
-    return results
-
-def read_webpage(url):
-    driver = webdriver.Firefox()
-    try:
-        message = f"Visiting URL: {url}"
-        print(message)  # Keep this for logging, but don't speak it
-
-        driver.get(url)
-        time.sleep(3)
-
-        content = driver.find_element(By.TAG_NAME, 'body').text
-        paragraphs = content.splitlines()
-
-        # Filter out short paragraphs and specific unwanted words
-        filtered_paragraphs = [
-            p for p in paragraphs if len(p.split()) > 5 and "about" not in p.lower()
-        ]
-
-        if len(filtered_paragraphs) > 0:
-            for paragraph in filtered_paragraphs:
-                print(paragraph)
-                speak(paragraph)
-                
-            user_choice = input("Would you like me to read more? (yes/no): ").lower()
-            if user_choice == "yes":
-                for paragraph in filtered_paragraphs:
-                    print(paragraph)
-                    speak(paragraph)
-            else:
-                speak("Okay, stopping here.")
-        else:
-            speak("I found no relevant content to read aloud.")
-    except Exception as e:
-        error_message = f"Error reading webpage: {e}"
-        print(error_message)
-        speak(error_message)
-    finally:
-        driver.quit()
-
-
 def perform_task(query):
-    query = query.lower()
+    query = normalize(query)
 
-    if "hello" in query or "hi" in query:
-        return "Hello! How can I assist you today?"
+    if query in ["hi", "hello"]:
+        speak("Hello! How can I help you today?")
+        return
 
-    elif "how are you" in query:
-        return "I'm Jarvis, just a virtual assistant, but thanks for asking! How are you?"
+    elif query in ["exit", "quit", "goodbye"]:
+        speak("Goodbye! Have a great day.")
+        exit()
 
     elif "help" in query:
         show_help()
-        return "Showing help and usage information."
+        return
 
-    elif "who is your owner" in query:
-        return "I was created by Gaurav Bhattacharjee."
-    elif "what is your name" in query:
-        return "I am your virtual assistant."
-    elif "what is your version" in query:
-        return "I am version 1.0."
-    elif "what is your operating system" in query:
-        return f"I am running on {platform.system()} {platform.release()}."
+    elif any(kw in query for kw in ["your name", "tell me your name", "say your name", "identify yourself", "give me your name", "name yourself", "whats your name", "who are you"]):
+        speak("I am your virtual assistant.")
+        return
+
+    elif any(kw in query for kw in ["your version", "which version", "say your version", "version are you", "give me your version", "share your version", "what version are you"]):
+        speak("I am version 1.1.")
+        return
+
+    elif any(kw in query for kw in ["your operating system", "which os", "say your os", "tell me your os", "give me your system info", "share your platform", "whats your os"]):
+        speak(f"I am running on {platform.system()} {platform.release()}.")
+        return
+
+    elif any(kw in query for kw in ["who is your owner", "your creator", "who made you", "who built you"]):
+        speak("I was created by Gaurav Bhattacharjee.")
+        return
+
     elif "open terminal" in query:
         if platform.system() == 'Linux':
             subprocess.run(['gnome-terminal'])
-        return "Opening terminal."
+        speak("Opening terminal.")
+        return
+
     elif "open browser" in query:
         if platform.system() == 'Linux':
             subprocess.run(['xdg-open', 'https://www.google.com'])
-        return "Opening your default browser."
+        speak("Opening your default browser.")
+        return
 
     elif "play song" in query:
-        song_name = query.split("play song")[-1].strip()
-        if song_name:
-            return play_song(song_name)
+        song = query.replace("play song", "").strip()
+        play_song(song)
+        return
+
+    elif query.startswith("what is") or query.startswith("who is") or query.startswith("define"):
+        speak("Ok wait let me think.")
+        answer = ask_gemini(query)
+        print(f"Jarvis: {answer}")
+        speak(answer)
+        return
+
+    elif "tell me about" in query:
+        speak("Let me check Google.")
+        url = google_search(query)
+        if url:
+            read_webpage(url)
         else:
-            return "Please specify a song to play."
+            speak("No information found.")
+        return
 
-    elif "tell me about" in query or "what is" in query:
-        speak("Let me check Google for that.")
-        google_results = google_search(query)
-        
-        if google_results:
-            first_result = google_results[0]
-            read_webpage(first_result)
-        else:
-            speak("Sorry, I couldn't find any information on Google.")
+    speak("Ok wait let me think.")
+    answer = ask_gemini(query)
+    print(f"Jarvis: {answer}")
+    speak(answer)
 
-    return "I don't know the answer to that yet."
-
-def play_song(song_name):
-    speak(f"Searching for {song_name} on YouTube.")
-
-    firefox_options = Options()
-    driver = webdriver.Firefox(options=firefox_options)
-    
-    try:
-        driver.get(f"https://www.youtube.com/results?search_query={song_name}")
-        time.sleep(2)
-
-        first_video = driver.find_element(By.XPATH, '//*[@id="video-title"]')
-        first_video.click()
-        time.sleep(5)
-
-        ad_playing = True
-        while ad_playing:
-            try:
-                ad_indicator = driver.find_element(By.CLASS_NAME, 'ytp-ad-text')
-                message = "Ad is playing, waiting for it to finish or skip button to appear..."
-                print(message)
-                speak(message)
-                
-                try:
-                    skip_button = driver.find_element(By.CLASS_NAME, 'ytp-ad-skip-button')
-                    skip_button.click()
-                    message = "Ad skipped."
-                    print(message)
-                    speak(message)
-                    ad_playing = False
-                except:
-                    time.sleep(3)
-            except:
-                message = "No ads detected, video is playing."
-                print(message)
-                speak(message)
-                ad_playing = False
-
-        speak(f"Now playing {song_name} on YouTube.")
-    
-    except Exception as e:
-        error_message = f"Error during playback: {e}"
-        print(error_message)
-        speak("I couldn't play the song. Please check your internet connection.")
-    
-    return "Song is now playing on YouTube."
 if __name__ == "__main__":
     display_banner()
-    speak("Hello! I'm Jarvis, your virtual assistant, developed by Gaurav Bhattacharjee. You can ask me anything.")
-    
+    speak("Hello! I'm Jarvis, your assistant developed by Gaurav Bhattacharjee. Ask me anything.")
     while True:
         try:
             question = ask_question()
-
-            if question.lower() in ["exit", "quit", "goodbye"]:
-                speak("Goodbye! Have a great day.")
-                break
-
-            response = perform_task(question)
-            if response is None:  
-                response = "I didn't understand that."
-            print(f"Answer: {response}")
-            speak(response)
-
+            if question.strip():
+                perform_task(question)
         except KeyboardInterrupt:
-            speak("Task skipped. You can ask me anything else.")
-            continue
+            speak("Interrupted. You may ask something else.")
