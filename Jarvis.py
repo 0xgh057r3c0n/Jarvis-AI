@@ -219,9 +219,15 @@ def perform_task(query):
 
     elif query.startswith("what is") or query.startswith("who is") or query.startswith("define"):
         speak("Ok wait let me think.")
-        answer = ask_gemini(query)
-        print(f"Jarvis: {answer}")
-        speak(answer)
+        # Ask Gemini for a short, plain-language answer
+        short_query = f"{query}. Answer briefly in one or two simple sentences, no bullet points, no code, no formatting."
+        answer = ask_gemini(short_query)
+
+        # Ensure no weird formatting slips through
+        clean_answer = answer.replace("**", "").replace("*", "").strip()
+
+        print(f"Jarvis: {clean_answer}")
+        speak(clean_answer)
         return
 
     elif "tell me about" in query:
